@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: barcelona-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=Barcelona Archives System
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=True
+      - ALLOWED_ORIGINS=http://localhost,http://localhost:80,http://frontend
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    networks:
+      - barcelona-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: barcelona-frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_APP_NAME=Barcelona Archives System
+    depends_on:
+      - backend
+    networks:
+      - barcelona-network
+    restart: unless-stopped
+
+networks:
+  barcelona-network:
+    driver: bridge
+
+# Optional: Add volumes for persistent data when you add a database
+# volumes:
+#   postgres_data:
