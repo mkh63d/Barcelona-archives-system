@@ -43,53 +43,17 @@ def get_llm():
         raise ValueError(f"Unsupported model provider: {provider}")
 
 
-def search_archives(query: str) -> list[dict]:
-    """Search for archives based on the query."""
-    from app.routes.archives import mock_archives
-    
-    query_lower = query.lower()
-    
-    # Search in mock data
-    results = [
-        archive for archive in mock_archives
-        if query_lower in archive["title"].lower() 
-        or query_lower in archive["description"].lower()
-        or query_lower in archive["category"].lower()
-    ]
-    
-    # If no specific search, return all
-    if not results and len(query.split()) < 3:
-        results = mock_archives
-    
-    return results
-
-
 def process_query(query: str) -> dict:
     """Process a user query and generate a response using LangChain."""
     try:
         llm = get_llm()
         
-        # Search archives
-        archives = search_archives(query)
+        # Create prompt for Barcelona Archives assistant
+        system_prompt = """You are a helpful AI assistant for the Barcelona Archives System. 
+Your role is to help users with questions about historical archives, provide information, 
+and assist with general queries. Be concise, informative, and friendly."""
         
-        # Prepare context
-        if archives:
-            archives_context = "\n".join([
-                f"- {a['title']} ({a['category']}, {a['date']}): {a['description']}"
-                for a in archives[:5]  # Limit to top 5 results
-            ])
-            context = f"Found {len(archives)} archives:\n{archives_context}"
-        else:
-            context = "No archives found matching the query."
-        
-        # Create prompt
-        system_prompt = """You are a helpful assistant for the Barcelona Archives System. 
-Your role is to help users find and understand historical archives.
-Be concise, informative, and friendly. Format your response in a clear, readable way.
-If archives are found, briefly describe them and suggest how they might be useful.
-If no archives are found, suggest alternative search terms or categories."""
-        
-        user_message = f"User query: {query}\n\nAvailable archives:\n{context}\n\nProvide a helpful response to the user."
+        user_message = f"User query: {query}\n\nProvide a helpful response to the user."
         
         messages = [
             HumanMessage(content=f"{system_prompt}\n\n{user_message}")
@@ -99,28 +63,12 @@ If no archives are found, suggest alternative search terms or categories."""
         
         return {
             "response": response.content,
-            "archives": archives,
             "query": query
         }
         
     except Exception as e:
         # Fallback response if LLM fails
-        archives = search_archives(query)
-        if archives:
-            response_text = f"I found {len(archives)} archives matching your query:\n\n"
-            for i, archive in enumerate(archives[:3], 1):
-                response_text += f"{i}. **{archive['title']}**\n"
-                response_text += f"   {archive['description']}\n"
-                response_text += f"   Category: {archive['category']} | Period: {archive['date']}\n\n"
-            if len(archives) > 3:
-                response_text += f"...and {len(archives) - 3} more results."
-        else:
-            response_text = "I couldn't find any archives matching your query. Try searching for categories like Municipal, Architecture, Civil Registry, Labor, or Photography."
-        
-        print(f"LLM Error: {e}")
-        
         return {
-            "response": response_text,
-            "archives": archives,
+            "response": f"I apologize, but I'm having trouble processing your request. Error: {str(e)}",
             "query": query
         }
