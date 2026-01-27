@@ -13,7 +13,6 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-    archives: list[dict]
     conversation_id: str
 
 
@@ -49,7 +48,6 @@ async def chat(request: ChatRequest):
         
         return ChatResponse(
             response=result["response"],
-            archives=result["archives"],
             conversation_id=conversation_id
         )
     except ValueError as e:

@@ -33,6 +33,9 @@
       <!-- Chat History -->
       <div class="flex-1 overflow-y-auto p-3 space-y-2">
         <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Recent</div>
+        <div v-if="chatHistory.length === 0" class="text-sm text-gray-500 text-center py-8">
+          No conversations yet
+        </div>
         <div 
           v-for="chat in chatHistory" 
           :key="chat.id"
@@ -89,22 +92,16 @@ import { ref } from 'vue'
 
 const appName = import.meta.env.VITE_APP_NAME || 'Barcelona Archives System'
 const sidebarOpen = ref(true)
-const currentChatId = ref(1)
+const currentChatId = ref(null)
 
-const chatHistory = ref([
-  { id: 1, title: 'Historical records query', date: 'Today' },
-  { id: 2, title: 'Architecture documents search', date: 'Yesterday' },
-  { id: 3, title: 'Municipal archives 1900-1920', date: '2 days ago' },
-  { id: 4, title: 'Gothic Quarter buildings', date: '3 days ago' },
-  { id: 5, title: 'Civil registry documents', date: 'Last week' }
-])
+const chatHistory = ref([])
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
 }
 
 const createNewChat = () => {
-  const newId = Math.max(...chatHistory.value.map(c => c.id)) + 1
+  const newId = chatHistory.value.length > 0 ? Math.max(...chatHistory.value.map(c => c.id)) + 1 : 1
   chatHistory.value.unshift({
     id: newId,
     title: 'New conversation',
