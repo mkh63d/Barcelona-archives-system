@@ -156,36 +156,29 @@ const sendMessage = async (content) => {
   isTyping.value = true
   
   try {
-    // Simulate API call to get archives
-    const response = await axios.get(`${apiUrl}/api/archives`, {
-      params: { search: content }
+    // Call LangGraph chat endpoint
+    const response = await axios.post(`${apiUrl}/api/chat`, {
+      message: content
     })
-    
-    // Generate response based on results
-    let responseText = ''
-    if (response.data.length > 0) {
-      responseText = `I found ${response.data.length} archives matching your query:\n\n`
-      response.data.slice(0, 3).forEach((archive, i) => {
-        responseText += `${i + 1}. ${archive.title}\n   ${archive.description}\n   Category: ${archive.category} | Period: ${archive.date}\n\n`
-      })
-      if (response.data.length > 3) {
-        responseText += `...and ${response.data.length - 3} more results.`
-      }
-    } else {
-      responseText = "I couldn't find any archives matching your query. Try a different search term or browse our categories: Municipal, Architecture, Civil Registry, Labor, and Photography."
-    }
-    
-    // Simulate delay for more natural feel
-    await new Promise(resolve => setTimeout(resolve, 1000))
     
     messages.value.push({
       role: 'assistant',
-      content: responseText
+      content: response.data.response
     })
   } catch (error) {
+    let errorMessage = "I'm having trouble processing your request. "
+    
+    if (error.response?.status === 400 && error.response?.data?.detail?.includes('API_KEY')) {
+      errorMessage += "Please configure your AI model API key in Settings."
+    } else if (error.response?.data?.detail) {
+      errorMessage += error.response.data.detail
+    } else {
+      errorMessage += "Please make sure the backend service is running and configured properly."
+    }
+    
     messages.value.push({
       role: 'assistant',
-      content: "I'm having trouble accessing the archives database right now. Please make sure the backend service is running. You can find mock data including Historical Records (1900-1920), Architectural Plans, Civil Registry Documents, Trade Union Records, and Photography Collections."
+      content: errorMessage
     })
   } finally {
     isTyping.value = false

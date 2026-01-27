@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "barcelona-archives-backend"
+version = "1.0.0"
+description = "Barcelona Archives System API with AI-powered chat"
+authors = ["Michał Hołyński"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.12"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+python-dotenv = "^1.0.1"
+pydantic = "^2.10.6"
+python-multipart = "^0.0.20"
+langchain = "^0.3.17"
+langchain-openai = "^0.2.14"
+langchain-anthropic = "^0.3.8"
+langchain-google-genai = "^2.0.8"
+langchain-core = "^0.3.29"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+black = "^24.0.0"
+ruff = "^0.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

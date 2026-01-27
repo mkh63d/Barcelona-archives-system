@@ -14,18 +14,15 @@ services:
       - PORT=8000
       - DEBUG=True
       - ALLOWED_ORIGINS=http://localhost,http://localhost:80,http://frontend
-    volumes:
-      - ./backend:/app
-      - /app/__pycache__
+      - MODEL_PROVIDER=gemini
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MODEL_NAME=gemini-1.5-flash
+      - MODEL_TEMPERATURE=0.7
     networks:
       - barcelona-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   frontend:
     build:

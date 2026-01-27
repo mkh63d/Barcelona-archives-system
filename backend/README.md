@@ -1,41 +1,61 @@
 # Barcelona Archives System - Backend
 
-FastAPI backend application with environment variable support.
+FastAPI backend application with AI-powered chat using Poetry for dependency management.
 
 ## Setup
 
-1. Create virtual environment:
-```bash
-python -m venv venv
-```
+### Option 1: Poetry (Recommended)
 
-2. Activate virtual environment:
+1. Install Poetry:
 ```bash
-# Windows
-venv\Scripts\activate
+# Windows (PowerShell)
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
 
 # Linux/Mac
-source venv/bin/activate
+curl -sSL https://install.python-poetry.org | python3 -
 ```
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
 
-4. Configure environment variables:
+3. Configure environment variables:
 ```bash
 cp .env.example .env
 ```
 
-5. Run the development server:
+4. Run the development server:
 ```bash
-python main.py
+poetry run python main.py
 ```
 
 Or use uvicorn directly:
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Option 2: pip (Alternative)
+
+1. Create virtual environment:
+```bash
+python -m venv venv
+venv\Scripts\activate  # Windows
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Configure environment variables:
+```bash
+cp .env.example .env
+```
+
+4. Run the development server:
+```bash
+python main.py
 ```
 
 The API will be available at http://localhost:8000

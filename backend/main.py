@@ -3,13 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 from app.routes import archives
+from app.routes import chat
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI(
     title=os.getenv("APP_NAME", "Barcelona Archives System"),
-    description="API for managing Barcelona historical archives",
+    description="API for managing Barcelona historical archives with AI-powered chat",
     version="1.0.0"
 )
 
@@ -26,6 +27,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(archives.router, prefix="/api", tags=["archives"])
+app.include_router(chat.router, prefix="/api", tags=["chat"])
 
 @app.get("/")
 async def root():
