@@ -54,6 +54,69 @@
               : 'bg-dark-400 text-gray-100 border border-dark-100'"
           >
             <div class="text-sm leading-relaxed whitespace-pre-wrap">{{ message.content }}</div>
+            
+            <!-- Sources Section (NotebookLM style) -->
+            <div v-if="message.role === 'assistant' && message.sources && message.sources.length > 0" class="mt-4 pt-4 border-t border-dark-200">
+              <div class="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-wider">Sources</div>
+              <div class="space-y-2">
+                <div 
+                  v-for="(source, idx) in message.sources" 
+                  :key="idx"
+                  class="group relative bg-dark-300 hover:bg-dark-200 border border-dark-200 hover:border-primary rounded-lg p-3 cursor-pointer transition-all"
+                  @click="toggleSource(index, idx)"
+                >
+                  <div class="flex items-start gap-3">
+                    <!-- Source Number Badge -->
+                    <div class="flex-shrink-0 w-6 h-6 bg-primary rounded flex items-center justify-center">
+                      <span class="text-white text-xs font-bold">{{ idx + 1 }}</span>
+                    </div>
+                    
+                    <!-- Source Info -->
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-100 truncate">{{ source.filename }}</span>
+                      </div>
+                      
+                      <!-- Relevance Score -->
+                      <div class="flex items-center gap-2 mb-2">
+                        <div class="flex-1 h-1.5 bg-dark-400 rounded-full overflow-hidden">
+                          <div 
+                            class="h-full bg-primary rounded-full transition-all"
+                            :style="{ width: `${source.relevance_score * 100}%` }"
+                          ></div>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ (source.relevance_score * 100).toFixed(0) }}% match</span>
+                      </div>
+                      
+                      <!-- Preview (expandable) -->
+                      <div 
+                        v-if="message.expandedSources && message.expandedSources.includes(idx)"
+                        class="text-xs text-gray-400 mt-2 p-2 bg-dark-400 rounded border border-dark-100"
+                      >
+                        {{ source.preview }}
+                      </div>
+                      <div v-else class="text-xs text-gray-500 line-clamp-2">
+                        {{ source.preview }}
+                      </div>
+                    </div>
+                    
+                    <!-- Expand Icon -->
+                    <svg 
+                      class="w-4 h-4 text-gray-500 group-hover:text-primary transition-transform flex-shrink-0"
+                      :class="{ 'rotate-180': message.expandedSources && message.expandedSources.includes(idx) }"
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- User Avatar -->
@@ -156,14 +219,18 @@ const sendMessage = async (content) => {
   isTyping.value = true
   
   try {
-    // Call LangGraph chat endpoint
+    // Call RAG chat endpoint
     const response = await axios.post(`${apiUrl}/api/chat`, {
       message: content
     })
     
     messages.value.push({
       role: 'assistant',
-      content: response.data.response
+      content: response.data.response,
+      sources: response.data.sources || [],
+      context_used: response.data.context_used || false,
+      num_sources: response.data.num_sources || 0,
+      expandedSources: [] // Track which sources are expanded
     })
   } catch (error) {
     let errorMessage = "I'm having trouble processing your request. "
@@ -178,11 +245,26 @@ const sendMessage = async (content) => {
     
     messages.value.push({
       role: 'assistant',
-      content: errorMessage
+      content: errorMessage,
+      sources: []
     })
   } finally {
     isTyping.value = false
     scrollToBottom()
+  }
+}
+
+const toggleSource = (messageIndex, sourceIndex) => {
+  const message = messages.value[messageIndex]
+  if (!message.expandedSources) {
+    message.expandedSources = []
+  }
+  
+  const idx = message.expandedSources.indexOf(sourceIndex)
+  if (idx > -1) {
+    message.expandedSources.splice(idx, 1)
+  } else {
+    message.expandedSources.push(sourceIndex)
   }
 }
 

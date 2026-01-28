@@ -2,15 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
-from app.routes import chat
+from app.routes import chat, admin
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI(
     title=os.getenv("APP_NAME", "Barcelona Archives System"),
-    description="AI-powered chat assistant for Barcelona archives",
-    version="1.0.0"
+    description="AI-powered RAG chat assistant for Barcelona archives with Qdrant vector database",
+    version="2.0.0"
 )
 
 # CORS Configuration
@@ -26,6 +26,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(chat.router, prefix="/api", tags=["chat"])
+app.include_router(admin.router, prefix="/api", tags=["admin"])
 
 @app.get("/")
 async def root():

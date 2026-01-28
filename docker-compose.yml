@@ -1,6 +1,18 @@
 version: '3.8'
 
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: barcelona-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - barcelona-network
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -13,6 +25,28 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+    depends_on:
+      - qdrant
+    networks:
+      - barcelona-network
+    restart: unless-stopped
+
+  pipeline:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    container_name: barcelona-pipeline
+    env_file:
+      - .env
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+    volumes:
+      - ./pipeline/data:/app/data
+    depends_on:
+      - qdrant
     networks:
       - barcelona-network
     restart: unless-stopped
@@ -36,3 +70,6 @@ services:
 networks:
   barcelona-network:
     driver: bridge
+
+volumes:
+  qdrant_data:
