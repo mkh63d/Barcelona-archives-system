@@ -53,7 +53,11 @@
               ? 'bg-primary text-white' 
               : 'bg-dark-400 text-gray-100 border border-dark-100'"
           >
-            <div class="text-sm leading-relaxed whitespace-pre-wrap">{{ message.content }}</div>
+            <div 
+              class="text-sm leading-relaxed prose prose-invert prose-sm max-w-none"
+              :class="message.role === 'user' ? 'prose-headings:text-white prose-p:text-white prose-li:text-white prose-strong:text-white' : ''"
+              v-html="renderMarkdown(message.content)"
+            ></div>
             
             <!-- Sources Section (NotebookLM style) -->
             <div v-if="message.role === 'assistant' && message.sources && message.sources.length > 0" class="mt-4 pt-4 border-t border-dark-200">
@@ -180,6 +184,13 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import axios from 'axios'
+import { marked } from 'marked'
+
+// Configure marked options
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
 
 const messages = ref([])
 const inputMessage = ref('')
@@ -189,11 +200,15 @@ const messagesContainer = ref(null)
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const examplePrompts = [
-  'Show me historical records from 1900-1920',
-  'Find architectural plans from Gothic Quarter',
-  'Search for civil registry documents',
-  'What photography collections are available?'
+  'What notable film was being heavily promoted at the time, and how was it described to audiences?',
+  'Which movie was portrayed as a dramatic odyssey against communist oppression?',
+  'What major film studio was associated with the release of this movie?',
+  'What kind of political authority is depicted as exerting control over the characters?'
 ]
+
+const renderMarkdown = (content) => {
+  return marked(content)
+}
 
 const scrollToBottom = () => {
   nextTick(() => {
