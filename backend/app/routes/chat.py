@@ -11,9 +11,18 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
+class SourceDocument(BaseModel):
+    filename: str
+    relevance_score: float
+    preview: str
+
+
 class ChatResponse(BaseModel):
     response: str
     conversation_id: str
+    sources: Optional[list[SourceDocument]] = []
+    context_used: bool = False
+    num_sources: int = 0
 
 
 class ModelConfig(BaseModel):
@@ -35,20 +44,29 @@ class ModelConfigUpdate(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Process a chat message using LangChain
+    Process a chat message using RAG (Retrieval Augmented Generation)
+    
+    Flow:
+    1. User sends message
+    2. System retrieves relevant documents from Qdrant vector database
+    3. LangChain generates response based on retrieved context
+    4. Returns response with source document citations
     """
     from app.agent import process_query
     import uuid
     
     try:
-        # Process the query
+        # Process the query with RAG
         result = process_query(request.message)
         
         conversation_id = request.conversation_id or str(uuid.uuid4())
         
         return ChatResponse(
             response=result["response"],
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            sources=result.get("sources", []),
+            context_used=result.get("context_used", False),
+            num_sources=result.get("num_sources", 0)
         )
     except ValueError as e:
         # Handle API key not set error

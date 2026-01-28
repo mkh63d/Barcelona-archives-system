@@ -1,12 +1,28 @@
-from typing import Optional
-from langchain_core.messages import HumanMessage
+from typing import Optional, List, Dict
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Lazy import for RAG retriever
+_rag_retriever = None
+
+
+def get_rag_retriever():
+    """Lazy initialization of RAG retriever"""
+    global _rag_retriever
+    if _rag_retriever is None:
+        from app.rag_retriever import RAGRetriever
+        _rag_retriever = RAGRetriever()
+    return _rag_retriever
 
 
 def get_llm():
     """Get the appropriate LLM based on environment configuration."""
     provider = os.getenv("MODEL_PROVIDER", "gemini").lower()
-    model_name = os.getenv("MODEL_NAME", "gemini-1.5-flash")
+    model_name = os.getenv("MODEL_NAME", "gemini-2.5-flash")
     temperature = float(os.getenv("MODEL_TEMPERATURE", "0.7"))
     
     if provider == "openai":
@@ -43,32 +59,127 @@ def get_llm():
         raise ValueError(f"Unsupported model provider: {provider}")
 
 
+def retrieve_context(query: str, top_k: int = 3) -> tuple[str, List[Dict]]:
+    """
+    Retrieve relevant context from vector database using RAG.
+    
+    Args:
+        query: User's question
+        top_k: Number of documents to retrieve
+        
+    Returns:
+        Tuple of (formatted context string, list of source documents)
+    """
+    try:
+        retriever = get_rag_retriever()
+        
+        # Retrieve relevant documents
+        documents = retriever.retrieve_context(query, top_k=top_k)
+        
+        if not documents:
+            return "No relevant documents found in the archives.", []
+        
+        # Format context from retrieved documents
+        context_parts = []
+        for idx, doc in enumerate(documents, 1):
+            context_parts.append(
+                f"[Document {idx}: {doc['filename']} - Relevance: {doc['score']:.2%}]\n"
+                f"{doc['content']}\n"
+            )
+        
+        context = "\n" + "="*80 + "\n".join(context_parts)
+        logger.info(f"✅ Retrieved {len(documents)} documents for RAG context")
+        
+        return context, documents
+        
+    except Exception as e:
+        logger.error(f"❌ Error retrieving context: {e}")
+        return f"Error accessing archives database: {str(e)}", []
+
+
 def process_query(query: str) -> dict:
-    """Process a user query and generate a response using LangChain."""
+    """
+    Process a user query using RAG (Retrieval Augmented Generation) with LangChain.
+    
+    Flow:
+    1. Retrieve relevant documents from Qdrant using CLIP embeddings
+    2. Build context from retrieved documents
+    3. Generate response using LLM with context
+    
+    Args:
+        query: User's question
+        
+    Returns:
+        Dict containing response, query, sources, and metadata
+    """
     try:
         llm = get_llm()
         
-        # Create prompt for Barcelona Archives assistant
-        system_prompt = """You are a helpful AI assistant for the Barcelona Archives System. 
-Your role is to help users with questions about historical archives, provide information, 
-and assist with general queries. Be concise, informative, and friendly."""
+        # Step 1: Retrieve relevant context from vector database
+        logger.info(f"🔍 Processing query with RAG: {query[:100]}...")
+        context, source_documents = retrieve_context(query, top_k=3)
         
-        user_message = f"User query: {query}\n\nProvide a helpful response to the user."
+        # Step 2: Create RAG prompt with retrieved context
+        system_prompt = """You are a knowledgeable AI assistant for the Barcelona Archives System. 
+Your role is to help users explore and understand historical archives from Barcelona.
+
+Available Archive Collections:
+- Municipal records from 1900-1920
+- Architectural plans from the Gothic Quarter (1850-1900)
+- Civil registry documents (1920-1950)
+- Trade union records during industrialization (1880-1930)
+- Historical photographs (1920-1960)
+
+Guidelines:
+1. Base your answers primarily on the retrieved documents provided
+2. Reference specific documents by name when citing information
+3. Provide historical context and significance
+4. If documents don't contain enough information, acknowledge this
+5. Be accurate, detailed, and informative
+6. Maintain a helpful, professional tone"""
+        
+        user_prompt = f"""Based on the following retrieved documents from the Barcelona Archives, answer the user's question.
+
+RETRIEVED ARCHIVE DOCUMENTS:
+{context}
+
+USER QUESTION: {query}
+
+Provide a comprehensive response based on the retrieved documents. Reference specific documents when citing information."""
         
         messages = [
-            HumanMessage(content=f"{system_prompt}\n\n{user_message}")
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
         ]
         
+        # Step 3: Generate response using LLM
+        logger.info("💬 Generating response with LLM...")
         response = llm.invoke(messages)
+        
+        logger.info("✅ Query processed successfully with RAG")
         
         return {
             "response": response.content,
-            "query": query
+            "query": query,
+            "sources": [
+                {
+                    "filename": doc["filename"],
+                    "relevance_score": doc["score"],
+                    "preview": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"]
+                }
+                for doc in source_documents
+            ],
+            "context_used": True,
+            "num_sources": len(source_documents)
         }
         
     except Exception as e:
-        # Fallback response if LLM fails
+        logger.error(f"❌ Error processing query with RAG: {e}")
+        # Fallback response if RAG fails
         return {
-            "response": f"I apologize, but I'm having trouble processing your request. Error: {str(e)}",
-            "query": query
+            "response": f"I apologize, but I'm having trouble accessing the archives database. Error: {str(e)}",
+            "query": query,
+            "sources": [],
+            "context_used": False,
+            "num_sources": 0
         }
