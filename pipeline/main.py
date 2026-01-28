@@ -130,9 +130,7 @@ class DocumentProcessor:
         if not data_dir.exists():
             logger.warning(f"Data directory {data_dir} does not exist. Creating...")
             data_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Initial migration
-            self._init_migration(data_dir)
+            logger.info(f"📁 Created {data_dir}. Please add your .txt files to this folder.")
         
         # Process all text files
         documents = []
@@ -144,10 +142,8 @@ class DocumentProcessor:
         if documents:
             self.encode_and_store(documents)
         else:
-            logger.info("No documents found to process")
+            logger.info("No documents found to process. Add .txt files to the exampleFile folder.")
 
-    def _init_migration(self, data_dir: Path):
-        
 
 def main():
     """Main pipeline execution"""
@@ -161,7 +157,7 @@ def main():
         processor = DocumentProcessor()
         
         # Process documents from data directory
-        data_dir = Path("/app/data")
+        data_dir = Path("./exampleFile")
         processor.scan_and_process_directory(data_dir)
         
         logger.info("✅ Pipeline completed successfully")

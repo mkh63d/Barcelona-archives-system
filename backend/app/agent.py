@@ -123,13 +123,6 @@ def process_query(query: str) -> dict:
         system_prompt = """You are a knowledgeable AI assistant for the Barcelona Archives System. 
 Your role is to help users explore and understand historical archives from Barcelona.
 
-Available Archive Collections:
-- Municipal records from 1900-1920
-- Architectural plans from the Gothic Quarter (1850-1900)
-- Civil registry documents (1920-1950)
-- Trade union records during industrialization (1880-1930)
-- Historical photographs (1920-1960)
-
 Guidelines:
 1. Base your answers primarily on the retrieved documents provided
 2. Reference specific documents by name when citing information
