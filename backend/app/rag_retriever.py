@@ -25,9 +25,9 @@ class RAGRetriever:
         logger.info(f"Connecting to Qdrant at {self.qdrant_host}:{self.qdrant_port}")
         self.client = QdrantClient(host=self.qdrant_host, port=self.qdrant_port)
         
-        # Initialize embedding model (same as pipeline)
+        # Initialize embedding model (must match pipeline model)
         logger.info("Loading embedding model for RAG...")
-        self.model = SentenceTransformer("sentence-transformers/clip-ViT-B-32-multilingual-v1")
+        self.model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
         logger.info("✅ RAG retriever initialized")
     
     def retrieve_context(self, query: str, top_k: int = 3) -> List[Dict]:
@@ -42,7 +42,7 @@ class RAGRetriever:
             List of relevant documents with metadata
         """
         try:
-            # Encode query using same model as pipeline
+            # Encode query
             logger.info(f"Encoding query: {query[:50]}...")
             query_embedding = self.model.encode(query, convert_to_numpy=True)
             
@@ -63,11 +63,16 @@ class RAGRetriever:
                     "id": result.id,
                     "score": float(result.score),
                     "filename": result.payload.get("filename", "Unknown"),
-                    "content": result.payload.get("full_content", ""),
-                    "file_type": result.payload.get("file_type", "text")
+                    "content": result.payload.get("full_content", result.payload.get("content", "")),
+                    "file_type": result.payload.get("file_type", "text"),
+                    "has_watermark": result.payload.get("has_watermark", False),
+                    "page_number": result.payload.get("page_number"),
+                    "web_url": result.payload.get("web_url"),
+                    "source": result.payload.get("source", result.payload.get("filename", "Unknown"))
                 }
                 documents.append(doc)
-                logger.info(f"  ✓ Retrieved: {doc['filename']} (score: {doc['score']:.3f})")
+                censorship_tag = " [CENSORED]" if doc['has_watermark'] else ""
+                logger.info(f"  ✓ Retrieved: {doc['filename']} (score: {doc['score']:.3f}){censorship_tag}")
             
             logger.info(f"✅ Retrieved {len(documents)} documents")
             return documents

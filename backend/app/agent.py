@@ -129,7 +129,8 @@ Guidelines:
 3. Provide historical context and significance
 4. If documents don't contain enough information, acknowledge this
 5. Be accurate, detailed, and informative
-6. Maintain a helpful, professional tone"""
+6. Maintain a helpful, professional tone
+7. IMPORTANT: If a document has a watermark indicator, it means the document was subject to censorship. In your response, mention that censored documents may not reflect reality accurately and information should be interpreted with caution."""
         
         user_prompt = f"""Based on the following retrieved documents from the Barcelona Archives, answer the user's question.
 
@@ -156,9 +157,12 @@ Provide a comprehensive response based on the retrieved documents. Reference spe
             "query": query,
             "sources": [
                 {
-                    "filename": doc["filename"],
+                    "filename": doc.get("source", doc["filename"]),
                     "relevance_score": doc["score"],
-                    "preview": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"]
+                    "preview": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"],
+                    "has_watermark": doc.get("has_watermark", False),
+                    "page_number": doc.get("page_number"),
+                    "web_url": doc.get("web_url")
                 }
                 for doc in source_documents
             ],

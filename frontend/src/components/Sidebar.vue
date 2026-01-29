@@ -187,8 +187,10 @@ const deleteChat = async (id) => {
     await conversationService.deleteConversation(id)
     await loadConversations()
     
-    if (currentChatId.value === id) {
-      await createNewChat()
+    currentChatId.value = conversations.value.length > 0 ? conversations.value[0].id : null
+
+    if (currentChatId.value) {
+      window.dispatchEvent(new CustomEvent('load-chat', { detail: currentChatId.value }))
     }
   }
 }
