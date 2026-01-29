@@ -37,8 +37,11 @@ export const conversationService = {
 
   // Update conversation messages
   async updateConversation(id, messages) {
+    // Convert to plain objects to avoid Vue reactivity issues
+    const plainMessages = JSON.parse(JSON.stringify(messages))
+    
     await db.conversations.update(id, {
-      messages,
+      messages: plainMessages,
       updatedAt: new Date().toISOString(),
     })
   },

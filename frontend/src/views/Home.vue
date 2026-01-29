@@ -1,104 +1,5 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Top Bar with Conversation Controls -->
-    <div class="bg-dark-400 border-b border-dark-100 px-4 py-3">
-      <div class="max-w-3xl mx-auto flex items-center justify-between gap-4">
-        <!-- Conversation Title -->
-        <div class="flex-1 flex items-center gap-3">
-          <button
-            @click="showConversationList = !showConversationList"
-            class="p-2 hover:bg-dark-200 rounded-lg transition-colors"
-            title="Conversations"
-          >
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <input
-            v-if="editingTitle"
-            v-model="currentTitle"
-            @blur="saveTitle"
-            @keyup.enter="saveTitle"
-            class="flex-1 bg-dark-300 text-gray-100 px-3 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Conversation title..."
-          />
-          <h1 v-else @click="editingTitle = true" class="text-gray-100 font-semibold cursor-pointer hover:text-primary transition-colors">
-            {{ currentTitle }}
-          </h1>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex items-center gap-2">
-          <button
-            @click="startNewConversation"
-            class="p-2 hover:bg-dark-200 rounded-lg transition-colors"
-            title="New conversation"
-          >
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-          <button
-            v-if="currentConversationId"
-            @click="exportCurrentConversation"
-            class="p-2 hover:bg-dark-200 rounded-lg transition-colors"
-            title="Export conversation"
-          >
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-          <button
-            v-if="currentConversationId"
-            @click="deleteCurrentConversation"
-            class="p-2 hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Delete conversation"
-          >
-            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Conversation List Sidebar -->
-    <div
-      v-if="showConversationList"
-      class="absolute top-14 left-0 w-80 h-[calc(100%-56px)] bg-dark-400 border-r border-dark-100 z-10 overflow-y-auto"
-    >
-      <div class="p-4">
-        <h2 class="text-lg font-bold text-gray-100 mb-4">Conversations</h2>
-        
-        <!-- Search -->
-        <input
-          v-model="searchQuery"
-          placeholder="Search conversations..."
-          class="w-full bg-dark-300 text-gray-100 px-3 py-2 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-
-        <!-- Conversation List -->
-        <div class="space-y-2">
-          <div
-            v-for="conv in filteredConversations"
-            :key="conv.id"
-            @click="loadConversation(conv.id)"
-            class="p-3 bg-dark-300 hover:bg-dark-200 rounded-lg cursor-pointer transition-colors"
-            :class="{ 'ring-2 ring-primary': conv.id === currentConversationId }"
-          >
-            <h3 class="text-sm font-semibold text-gray-100 mb-1 truncate">{{ conv.title }}</h3>
-            <p class="text-xs text-gray-500">
-              {{ conv.messages.length }} messages • {{ formatDate(conv.updatedAt) }}
-            </p>
-          </div>
-        </div>
-
-        <div v-if="filteredConversations.length === 0" class="text-center text-gray-500 py-8">
-          No conversations found
-        </div>
-      </div>
-    </div>
-
     <!-- Messages Area -->
     <div class="flex-1 overflow-y-auto" ref="messagesContainer">
       <!-- Welcome State -->
@@ -281,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted, computed, watch } from 'vue'
+import { ref, nextTick, onMounted, watch, inject } from 'vue'
 import axios from 'axios'
 import { marked } from 'marked'
 import { conversationService } from '../db.js'
@@ -296,14 +197,7 @@ const messages = ref([])
 const inputMessage = ref('')
 const isTyping = ref(false)
 const messagesContainer = ref(null)
-
-// Conversation management
 const currentConversationId = ref(null)
-const currentTitle = ref('New Conversation')
-const conversations = ref([])
-const showConversationList = ref(false)
-const editingTitle = ref(false)
-const searchQuery = ref('')
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -318,33 +212,6 @@ const renderMarkdown = (content) => {
   return marked(content)
 }
 
-// Computed property for filtered conversations
-const filteredConversations = computed(() => {
-  if (!searchQuery.value) return conversations.value
-  return conversations.value.filter(conv => 
-    conv.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    conv.messages.some(msg => 
-      msg.content.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  )
-})
-
-// Format date helper
-const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInMs = now - date
-  const diffInMins = Math.floor(diffInMs / 60000)
-  const diffInHours = Math.floor(diffInMs / 3600000)
-  const diffInDays = Math.floor(diffInMs / 86400000)
-
-  if (diffInMins < 1) return 'Just now'
-  if (diffInMins < 60) return `${diffInMins}m ago`
-  if (diffInHours < 24) return `${diffInHours}h ago`
-  if (diffInDays < 7) return `${diffInDays}d ago`
-  return date.toLocaleDateString()
-}
-
 // Auto-save messages when they change
 watch(messages, async (newMessages) => {
   if (currentConversationId.value && newMessages.length > 0) {
@@ -352,74 +219,69 @@ watch(messages, async (newMessages) => {
       currentConversationId.value,
       newMessages
     )
-    await loadConversationList()
+    
+    // Auto-generate title from first user message
+    if (newMessages.length === 1) {
+      const firstMessage = newMessages[0].content
+      const smartTitle = firstMessage.length > 50 
+        ? firstMessage.substring(0, 50) + '...' 
+        : firstMessage
+      await conversationService.updateTitle(
+        currentConversationId.value,
+        smartTitle
+      )
+    }
+    
+    // Notify App.vue to reload conversations
+    if (window.reloadConversations) {
+      await window.reloadConversations()
+    }
   }
 }, { deep: true })
 
-// Load conversations list
-const loadConversationList = async () => {
-  conversations.value = await conversationService.getAllConversations()
-}
-
-// Start new conversation
-const startNewConversation = async () => {
-  const conversation = await conversationService.createConversation()
-  currentConversationId.value = conversation.id
-  currentTitle.value = conversation.title
-  messages.value = []
-  await loadConversationList()
-  showConversationList.value = false
-}
-
 // Load a conversation
 const loadConversation = async (id) => {
-  const conversation = await conversationService.getConversation(id)
-  if (conversation) {
-    currentConversationId.value = conversation.id
-    currentTitle.value = conversation.title
-    messages.value = conversation.messages
-    showConversationList.value = false
-    scrollToBottom()
+  console.log('Loading conversation ID:', id)
+  try {
+    const conversation = await conversationService.getConversation(id)
+    console.log('Conversation loaded:', conversation)
+    console.log('Conversation messages:', conversation?.messages)
+    if (conversation) {
+      currentConversationId.value = conversation.id
+      messages.value = conversation.messages || []
+      console.log('Messages set:', messages.value.length, messages.value)
+      nextTick(() => {
+        scrollToBottom()
+      })
+    }
+  } catch (error) {
+    console.error('Error loading conversation:', error)
   }
 }
 
-// Save conversation title
-const saveTitle = async () => {
-  editingTitle.value = false
-  if (currentConversationId.value && currentTitle.value.trim()) {
-    await conversationService.updateTitle(
-      currentConversationId.value,
-      currentTitle.value
-    )
-    await loadConversationList()
-  }
-}
-
-// Export conversation
-const exportCurrentConversation = async () => {
-  if (currentConversationId.value) {
-    await conversationService.exportConversation(currentConversationId.value)
-  }
-}
-
-// Delete conversation
-const deleteCurrentConversation = async () => {
-  if (currentConversationId.value && confirm('Delete this conversation?')) {
-    await conversationService.deleteConversation(currentConversationId.value)
-    await loadConversationList()
-    await startNewConversation()
-  }
-}
-
-// Initialize on mount
+// Listen for chat selection from App.vue
 onMounted(async () => {
-  await loadConversationList()
-  if (conversations.value.length > 0) {
-    // Load the most recent conversation
-    await loadConversation(conversations.value[0].id)
-  } else {
-    // Create first conversation
-    await startNewConversation()
+  console.log('Home.vue mounted')
+  
+  // Listen for new chat event
+  window.addEventListener('new-chat', async (e) => {
+    console.log('Received new-chat event:', e.detail)
+    currentConversationId.value = e.detail
+    messages.value = []
+    scrollToBottom()
+  })
+  
+  // Listen for load chat event
+  window.addEventListener('load-chat', async (e) => {
+    console.log('Received load-chat event:', e.detail)
+    await loadConversation(e.detail)
+  })
+  
+  // Get current chat from App.vue
+  const currentChatId = inject('currentChatId', null)
+  console.log('Injected currentChatId:', currentChatId)
+  if (currentChatId && currentChatId.value) {
+    await loadConversation(currentChatId.value)
   }
 })
 
@@ -433,6 +295,8 @@ const scrollToBottom = () => {
 
 const sendMessage = async (content) => {
   if (!content.trim()) return
+  
+  console.log('Sending message, current conversation ID:', currentConversationId.value)
   
   // Add user message
   messages.value.push({
