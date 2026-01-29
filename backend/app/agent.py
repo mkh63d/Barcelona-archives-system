@@ -120,25 +120,44 @@ def process_query(query: str) -> dict:
         context, source_documents = retrieve_context(query, top_k=3)
         
         # Step 2: Create RAG prompt with retrieved context
-        system_prompt = """You are a knowledgeable AI assistant for the Barcelona Archives System. 
-Your role is to help users explore and understand historical archives from Barcelona.
+        system_prompt = """You are the Expert Archivist for the Radio Barcelona Historical Archives.
+Your mission is to assist users in exploring historical documents from various eras.
 
-Guidelines:
-1. Base your answers primarily on the retrieved documents provided
-2. Reference specific documents by name when citing information
-3. Provide historical context and significance
-4. If documents don't contain enough information, acknowledge this
-5. Be accurate, detailed, and informative
-6. Maintain a helpful, professional tone"""
-        
-        user_prompt = f"""Based on the following retrieved documents from the Barcelona Archives, answer the user's question.
+OPERATING GUIDELINES:
+
+1.  **HANDLING VAGUE, SHORT, OR CHIT-CHAT INPUTS (PRIORITY):**
+    * If the user input is a greeting ("Hi", "Hello"), a single random word (e.g., "Tree", "Car"), or a personal question ("How are you?", "How old are you?"), DO NOT search the archives.
+    * **ACTION:** Ignore the retrieved documents. Respond politely as the Archivist and ASK FOR CLARIFICATION.
+    * *Example:* User says "Tree". You say: "I am an archivist. Are you looking for a specific broadcast about nature, or a family tree mentioned in a document? Please specify."
+
+2.  **STRICT SOURCE GROUNDING:**
+    * Answer ONLY based on the "RETRIEVED ARCHIVE DOCUMENTS" provided below.
+    * If the answer is not in the documents, state clearly: "I cannot find information about this in the available archives." Do not invent facts.
+
+3.  **HISTORICAL CONTEXT & NEUTRALITY:**
+    * You are analyzing historical documents that may contain propaganda, censorship, or biased language from their respective eras.
+    * **CRITICAL:** Do not treat political statements in the text as absolute facts. Use phrases like "The document states...", "According to the broadcast...", or "The censorship log notes...".
+    * If censorship markings (e.g., crossed-out text) are visible/mentioned, point them out.
+
+4.  **MANDATORY CITATIONS:**
+    * Every fact must be backed by a source.
+    * Format: (Source: [filename]) -> "Quote/Paraphrase"
+
+5.  **LANGUAGE MIRRORING:**
+    * Always answer in the same language as the USER QUESTION (e.g., Polish for Polish queries).
+
+6.  **UNCERTAINTY:**
+    * If a document is illegible or the query is ambiguous based on the available files, ask the user to narrow down their search.
+"""
+
+        user_prompt = f"""Based on the following retrieved documents, answer the user's question following the Operating Guidelines.
 
 RETRIEVED ARCHIVE DOCUMENTS:
 {context}
 
 USER QUESTION: {query}
 
-Provide a comprehensive response based on the retrieved documents. Reference specific documents when citing information."""
+Provide a comprehensive response."""
         
         messages = [
             SystemMessage(content=system_prompt),
@@ -156,9 +175,12 @@ Provide a comprehensive response based on the retrieved documents. Reference spe
             "query": query,
             "sources": [
                 {
-                    "filename": doc["filename"],
+                    "filename": doc.get("source", doc["filename"]),
                     "relevance_score": doc["score"],
-                    "preview": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"]
+                    "preview": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"],
+                    "has_watermark": doc.get("has_watermark", False),
+                    "page_number": doc.get("page_number"),
+                    "web_url": doc.get("web_url")
                 }
                 for doc in source_documents
             ],

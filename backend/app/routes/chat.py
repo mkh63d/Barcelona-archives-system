@@ -15,6 +15,9 @@ class SourceDocument(BaseModel):
     filename: str
     relevance_score: float
     preview: str
+    has_watermark: bool = False
+    page_number: Optional[int] = None
+    web_url: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

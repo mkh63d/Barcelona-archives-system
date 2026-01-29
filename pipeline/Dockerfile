@@ -19,5 +19,5 @@ COPY . .
 # Create data directory
 RUN mkdir -p /app/data
 
-# Run the pipeline
-CMD ["python", "main.py"]
+# Run the pipeline V2
+CMD ["python", "pipeline_v2.py"]

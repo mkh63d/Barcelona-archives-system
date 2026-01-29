@@ -69,18 +69,22 @@ class DocumentProcessor:
             raise
     
     def process_text_file(self, file_path: Path) -> Dict:
-        """Process a text file and extract content"""
+        """Process a text or markdown file and extract content"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
+            # Determine file type based on extension
+            file_extension = file_path.suffix.lower()
+            file_type = "markdown" if file_extension == ".md" else "text"
+            
             return {
                 "filename": file_path.name,
                 "content": content,
-                "file_type": "text"
+                "file_type": file_type
             }
         except Exception as e:
-            logger.error(f"Error processing text file {file_path}: {e}")
+            logger.error(f"Error processing file {file_path}: {e}")
             return None
     
     def encode_and_store(self, documents: List[Dict]):
@@ -130,11 +134,11 @@ class DocumentProcessor:
         if not data_dir.exists():
             logger.warning(f"Data directory {data_dir} does not exist. Creating...")
             data_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"📁 Created {data_dir}. Please add your .txt files to this folder.")
+            logger.info(f"📁 Created {data_dir}. Please add your .txt or .md files to this folder.")
         
-        # Process all text files
+        # Process all text and markdown files
         documents = []
-        for file_path in data_dir.glob("*.txt"):
+        for file_path in list(data_dir.glob("*.txt")) + list(data_dir.glob("*.md")):
             doc = self.process_text_file(file_path)
             if doc:
                 documents.append(doc)
@@ -142,7 +146,7 @@ class DocumentProcessor:
         if documents:
             self.encode_and_store(documents)
         else:
-            logger.info("No documents found to process. Add .txt files to the exampleFile folder.")
+            logger.info("No documents found to process. Add .txt or .md files to the exampleFile folder.")
 
 
 def main():

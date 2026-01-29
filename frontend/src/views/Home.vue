@@ -66,10 +66,10 @@
                 <div 
                   v-for="(source, idx) in message.sources" 
                   :key="idx"
-                  class="group relative bg-dark-300 hover:bg-dark-200 border border-dark-200 hover:border-primary rounded-lg p-3 cursor-pointer transition-all"
-                  @click="toggleSource(index, idx)"
+                  class="group relative bg-dark-300 hover:bg-dark-200 border border-dark-200 hover:border-primary rounded-lg p-3 transition-all"
+                  :class="source.web_url ? '' : 'cursor-pointer'"
                 >
-                  <div class="flex items-start gap-3">
+                  <div class="flex items-start gap-3" @click="!source.web_url ? toggleSource(index, idx) : null">
                     <!-- Source Number Badge -->
                     <div class="flex-shrink-0 w-6 h-6 bg-primary rounded flex items-center justify-center">
                       <span class="text-white text-xs font-bold">{{ idx + 1 }}</span>
@@ -81,7 +81,43 @@
                         <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <span class="text-sm font-semibold text-gray-100 truncate">{{ source.filename }}</span>
+                        <a 
+                          v-if="source.web_url" 
+                          :href="source.web_url" 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-sm font-semibold text-primary hover:text-primary-400 underline truncate transition-colors"
+                          @click.stop
+                        >
+                          {{ source.filename }}
+                        </a>
+                        <span v-else class="text-sm font-semibold text-gray-100 truncate">{{ source.filename }}</span>
+                        <!-- Link Icon for web URLs -->
+                        <svg 
+                          v-if="source.web_url" 
+                          class="w-4 h-4 text-primary flex-shrink-0"
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <!-- Censorship Warning Badge -->
+                        <span 
+                          v-if="source.has_watermark" 
+                          class="ml-1 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-xs font-semibold rounded uppercase flex-shrink-0"
+                          title="This document was subject to censorship and may not reflect reality accurately"
+                        >
+                          Censored
+                        </span>
+                      </div>
+                      
+                      <!-- Censorship Warning Message -->
+                      <div v-if="source.has_watermark" class="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs text-yellow-300 flex items-start gap-2">
+                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>This document was checked by censorship. The real interpretation might differ from reality.</span>
                       </div>
                       
                       <!-- Relevance Score -->
@@ -107,16 +143,21 @@
                       </div>
                     </div>
                     
-                    <!-- Expand Icon -->
-                    <svg 
-                      class="w-4 h-4 text-gray-500 group-hover:text-primary transition-transform flex-shrink-0"
-                      :class="{ 'rotate-180': message.expandedSources && message.expandedSources.includes(idx) }"
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
+                    <!-- Expand Icon (only if no web_url or always show for expandability) -->
+                    <button
+                      @click.stop="toggleSource(index, idx)"
+                      class="flex-shrink-0"
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+                      <svg 
+                        class="w-4 h-4 text-gray-500 group-hover:text-primary transition-transform"
+                        :class="{ 'rotate-180': message.expandedSources && message.expandedSources.includes(idx) }"
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -298,11 +339,17 @@ const sendMessage = async (content) => {
   
   console.log('Sending message, current conversation ID:', currentConversationId.value)
   
-  // Add user message
-  messages.value.push({
+  // Capture the conversation ID at the time of sending
+  const requestConversationId = currentConversationId.value
+  
+  // Create user message object
+  const userMessage = {
     role: 'user',
     content: content
-  })
+  }
+  
+  // Add user message to current view
+  messages.value.push(userMessage)
   
   inputMessage.value = ''
   scrollToBottom()
@@ -316,14 +363,37 @@ const sendMessage = async (content) => {
       message: content
     })
     
-    messages.value.push({
+    // Create assistant message
+    const assistantMessage = {
       role: 'assistant',
       content: response.data.response,
       sources: response.data.sources || [],
       context_used: response.data.context_used || false,
       num_sources: response.data.num_sources || 0,
       expandedSources: [] // Track which sources are expanded
-    })
+    }
+    
+    // Check if we're still on the same conversation
+    if (requestConversationId === currentConversationId.value) {
+      // User is still viewing the same conversation, add to current view
+      messages.value.push(assistantMessage)
+    } else {
+      // User switched to a different conversation
+      // Save the response to the correct conversation in the database
+      console.log('Conversation switched during request. Saving to original conversation:', requestConversationId)
+      
+      // Load the original conversation, add messages, and save
+      const originalConversation = await conversationService.getConversation(requestConversationId)
+      if (originalConversation) {
+        const updatedMessages = [...originalConversation.messages, userMessage, assistantMessage]
+        await conversationService.updateConversation(requestConversationId, updatedMessages)
+        
+        // Notify to reload conversations list
+        if (window.reloadConversations) {
+          await window.reloadConversations()
+        }
+      }
+    }
   } catch (error) {
     let errorMessage = "I'm having trouble processing your request. "
     
@@ -335,11 +405,27 @@ const sendMessage = async (content) => {
       errorMessage += "Please make sure the backend service is running and configured properly."
     }
     
-    messages.value.push({
+    const errorMessageObj = {
       role: 'assistant',
       content: errorMessage,
       sources: []
-    })
+    }
+    
+    // Check if we're still on the same conversation for error handling too
+    if (requestConversationId === currentConversationId.value) {
+      messages.value.push(errorMessageObj)
+    } else {
+      // Save error to original conversation
+      const originalConversation = await conversationService.getConversation(requestConversationId)
+      if (originalConversation) {
+        const updatedMessages = [...originalConversation.messages, userMessage, errorMessageObj]
+        await conversationService.updateConversation(requestConversationId, updatedMessages)
+        
+        if (window.reloadConversations) {
+          await window.reloadConversations()
+        }
+      }
+    }
   } finally {
     isTyping.value = false
     scrollToBottom()

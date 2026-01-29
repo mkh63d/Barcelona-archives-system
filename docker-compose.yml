@@ -45,11 +45,11 @@ services:
       - QDRANT_PORT=6333
     volumes:
       - ./pipeline/data:/app/data
+      - ./pipeline/data/db:/db
     depends_on:
       - qdrant
     networks:
       - barcelona-network
-    restart: unless-stopped
 
   frontend:
     build:
