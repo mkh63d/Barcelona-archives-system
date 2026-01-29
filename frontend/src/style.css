@@ -70,3 +70,105 @@
     overflow: hidden;
   }
 }
+
+/* Markdown styling for dark theme */
+.prose {
+  @apply text-gray-100;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  @apply text-gray-100 font-bold;
+}
+
+.prose h1 {
+  @apply text-2xl mt-4 mb-2;
+}
+
+.prose h2 {
+  @apply text-xl mt-3 mb-2;
+}
+
+.prose h3 {
+  @apply text-lg mt-2 mb-1;
+}
+
+.prose p {
+  @apply my-2;
+}
+
+.prose strong,
+.prose b {
+  @apply font-bold text-gray-50;
+}
+
+.prose em,
+.prose i {
+  @apply italic;
+}
+
+.prose code {
+  @apply bg-dark-500 text-primary px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-dark-500 text-gray-100 p-4 rounded-lg my-3 overflow-x-auto;
+}
+
+.prose pre code {
+  @apply bg-transparent text-gray-100 p-0;
+}
+
+.prose a {
+  @apply text-primary hover:text-primary-300 underline;
+}
+
+.prose ul,
+.prose ol {
+  @apply my-2 ml-4;
+}
+
+.prose ul {
+  @apply list-disc;
+}
+
+.prose ol {
+  @apply list-decimal;
+}
+
+.prose li {
+  @apply my-1;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-primary pl-4 italic text-gray-300 my-3;
+}
+
+.prose table {
+  @apply w-full border-collapse my-3;
+}
+
+.prose th,
+.prose td {
+  @apply border border-dark-100 px-3 py-2;
+}
+
+.prose th {
+  @apply bg-dark-400 font-bold;
+}
+
+.prose td {
+  @apply bg-dark-300;
+}
+
+.prose hr {
+  @apply border-dark-100 my-4;
+}
+
+.prose img {
+  @apply rounded-lg my-3;
+}

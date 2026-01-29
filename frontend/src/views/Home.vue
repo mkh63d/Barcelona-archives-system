@@ -53,7 +53,11 @@
               ? 'bg-primary text-white' 
               : 'bg-dark-400 text-gray-100 border border-dark-100'"
           >
-            <div class="text-sm leading-relaxed whitespace-pre-wrap">{{ message.content }}</div>
+            <div 
+              class="text-sm leading-relaxed prose prose-invert prose-sm max-w-none"
+              :class="message.role === 'user' ? 'prose-headings:text-white prose-p:text-white prose-li:text-white prose-strong:text-white' : ''"
+              v-html="renderMarkdown(message.content)"
+            ></div>
             
             <!-- Sources Section (NotebookLM style) -->
             <div v-if="message.role === 'assistant' && message.sources && message.sources.length > 0" class="mt-4 pt-4 border-t border-dark-200">
@@ -178,22 +182,108 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted, watch, inject } from 'vue'
 import axios from 'axios'
+import { marked } from 'marked'
+import { conversationService } from '../db.js'
+
+// Configure marked options
+marked.setOptions({
+  breaks: true,
+  gfm: true
+})
 
 const messages = ref([])
 const inputMessage = ref('')
 const isTyping = ref(false)
 const messagesContainer = ref(null)
+const currentConversationId = ref(null)
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const examplePrompts = [
-  'Show me historical records from 1900-1920',
-  'Find architectural plans from Gothic Quarter',
-  'Search for civil registry documents',
-  'What photography collections are available?'
+  'What notable film was being heavily promoted at the time, and how was it described to audiences?',
+  'Which movie was portrayed as a dramatic odyssey against communist oppression?',
+  'What major film studio was associated with the release of this movie?',
+  'What kind of political authority is depicted as exerting control over the characters?'
 ]
+
+const renderMarkdown = (content) => {
+  return marked(content)
+}
+
+// Auto-save messages when they change
+watch(messages, async (newMessages) => {
+  if (currentConversationId.value && newMessages.length > 0) {
+    await conversationService.updateConversation(
+      currentConversationId.value,
+      newMessages
+    )
+    
+    // Auto-generate title from first user message
+    if (newMessages.length === 1) {
+      const firstMessage = newMessages[0].content
+      const smartTitle = firstMessage.length > 50 
+        ? firstMessage.substring(0, 50) + '...' 
+        : firstMessage
+      await conversationService.updateTitle(
+        currentConversationId.value,
+        smartTitle
+      )
+    }
+    
+    // Notify App.vue to reload conversations
+    if (window.reloadConversations) {
+      await window.reloadConversations()
+    }
+  }
+}, { deep: true })
+
+// Load a conversation
+const loadConversation = async (id) => {
+  console.log('Loading conversation ID:', id)
+  try {
+    const conversation = await conversationService.getConversation(id)
+    console.log('Conversation loaded:', conversation)
+    console.log('Conversation messages:', conversation?.messages)
+    if (conversation) {
+      currentConversationId.value = conversation.id
+      messages.value = conversation.messages || []
+      console.log('Messages set:', messages.value.length, messages.value)
+      nextTick(() => {
+        scrollToBottom()
+      })
+    }
+  } catch (error) {
+    console.error('Error loading conversation:', error)
+  }
+}
+
+// Listen for chat selection from App.vue
+onMounted(async () => {
+  console.log('Home.vue mounted')
+  
+  // Listen for new chat event
+  window.addEventListener('new-chat', async (e) => {
+    console.log('Received new-chat event:', e.detail)
+    currentConversationId.value = e.detail
+    messages.value = []
+    scrollToBottom()
+  })
+  
+  // Listen for load chat event
+  window.addEventListener('load-chat', async (e) => {
+    console.log('Received load-chat event:', e.detail)
+    await loadConversation(e.detail)
+  })
+  
+  // Get current chat from App.vue
+  const currentChatId = inject('currentChatId', null)
+  console.log('Injected currentChatId:', currentChatId)
+  if (currentChatId && currentChatId.value) {
+    await loadConversation(currentChatId.value)
+  }
+})
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -205,6 +295,8 @@ const scrollToBottom = () => {
 
 const sendMessage = async (content) => {
   if (!content.trim()) return
+  
+  console.log('Sending message, current conversation ID:', currentConversationId.value)
   
   // Add user message
   messages.value.push({

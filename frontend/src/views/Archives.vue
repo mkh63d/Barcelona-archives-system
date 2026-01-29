@@ -70,24 +70,6 @@ const fetchArchives = async () => {
   } catch (err) {
     error.value = 'Failed to fetch archives. Make sure the backend is running.'
     console.error('Error fetching archives:', err)
-    
-    // Mock data for demonstration when backend is not available
-    archives.value = [
-      {
-        id: 1,
-        title: 'Historical Records 1900-1920',
-        description: 'Collection of municipal records from early 20th century Barcelona',
-        category: 'Municipal',
-        date: '1900-1920'
-      },
-      {
-        id: 2,
-        title: 'Architectural Plans',
-        description: 'Original architectural drawings of Gothic Quarter buildings',
-        category: 'Architecture',
-        date: '1850-1900'
-      }
-    ]
   } finally {
     loading.value = false
   }
