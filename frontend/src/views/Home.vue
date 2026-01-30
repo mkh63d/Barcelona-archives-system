@@ -66,10 +66,10 @@
                 <div 
                   v-for="(source, idx) in message.sources" 
                   :key="idx"
-                  class="group relative bg-dark-300 hover:bg-dark-200 border border-dark-200 hover:border-primary rounded-lg p-3 transition-all"
-                  :class="source.web_url ? '' : 'cursor-pointer'"
+                  class="group relative bg-dark-300 hover:bg-dark-200 border border-dark-200 hover:border-primary rounded-lg p-3 transition-all cursor-pointer"
+                  @click="toggleSource(index, idx)"
                 >
-                  <div class="flex items-start gap-3" @click="!source.web_url ? toggleSource(index, idx) : null">
+                  <div class="flex items-start gap-3">
                     <!-- Source Number Badge -->
                     <div class="flex-shrink-0 w-6 h-6 bg-primary rounded flex items-center justify-center">
                       <span class="text-white text-xs font-bold">{{ idx + 1 }}</span>
@@ -81,27 +81,7 @@
                         <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <a 
-                          v-if="source.web_url" 
-                          :href="source.web_url" 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-sm font-semibold text-primary hover:text-primary-400 underline truncate transition-colors"
-                          @click.stop
-                        >
-                          {{ source.filename }}
-                        </a>
-                        <span v-else class="text-sm font-semibold text-gray-100 truncate">{{ source.filename }}</span>
-                        <!-- Link Icon for web URLs -->
-                        <svg 
-                          v-if="source.web_url" 
-                          class="w-4 h-4 text-primary flex-shrink-0"
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
+                        <span class="text-sm font-semibold text-gray-100 truncate">{{ source.filename }}</span>
                         <!-- Censorship Warning Badge -->
                         <span 
                           v-if="source.has_watermark" 
@@ -110,14 +90,6 @@
                         >
                           Censored
                         </span>
-                      </div>
-                      
-                      <!-- Censorship Warning Message -->
-                      <div v-if="source.has_watermark" class="mb-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs text-yellow-300 flex items-start gap-2">
-                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <span>This document was checked by censorship. The real interpretation might differ from reality.</span>
                       </div>
                       
                       <!-- Relevance Score -->
@@ -131,31 +103,21 @@
                         <span class="text-xs text-gray-500">{{ (source.relevance_score * 100).toFixed(0) }}% match</span>
                       </div>
                       
-                      <!-- Preview (expandable) -->
-                      <div 
-                        v-if="message.expandedSources && message.expandedSources.includes(idx)"
-                        class="text-xs text-gray-400 mt-2 p-2 bg-dark-400 rounded border border-dark-100"
-                      >
-                        {{ source.preview }}
-                      </div>
-                      <div v-else class="text-xs text-gray-500 line-clamp-2">
+                      <!-- Preview (truncated) -->
+                      <div class="text-xs text-gray-500 line-clamp-2">
                         {{ source.preview }}
                       </div>
                     </div>
                     
-                    <!-- Expand Icon (only if no web_url or always show for expandability) -->
-                    <button
-                      @click.stop="toggleSource(index, idx)"
-                      class="flex-shrink-0"
-                    >
+                    <!-- View Icon -->
+                    <button class="flex-shrink-0">
                       <svg 
-                        class="w-4 h-4 text-gray-500 group-hover:text-primary transition-transform"
-                        :class="{ 'rotate-180': message.expandedSources && message.expandedSources.includes(idx) }"
+                        class="w-5 h-5 text-gray-500 group-hover:text-primary transition-colors"
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
                       >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                   </div>
@@ -224,6 +186,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted, watch, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { marked } from 'marked'
 import { conversationService } from '../db.js'
@@ -233,6 +196,8 @@ marked.setOptions({
   breaks: true,
   gfm: true
 })
+
+const router = useRouter()
 
 const messages = ref([])
 const inputMessage = ref('')
@@ -441,16 +406,13 @@ const sendMessage = async (content) => {
 
 const toggleSource = (messageIndex, sourceIndex) => {
   const message = messages.value[messageIndex]
-  if (!message.expandedSources) {
-    message.expandedSources = []
-  }
+  const source = message.sources[sourceIndex]
   
-  const idx = message.expandedSources.indexOf(sourceIndex)
-  if (idx > -1) {
-    message.expandedSources.splice(idx, 1)
-  } else {
-    message.expandedSources.push(sourceIndex)
-  }
+  // Navigate to SourceView page with source data and conversation ID
+  router.push({
+    path: `/source/${encodeURIComponent(JSON.stringify(source))}`,
+    query: { from: currentConversationId.value }
+  })
 }
 
 const handleSubmit = () => {

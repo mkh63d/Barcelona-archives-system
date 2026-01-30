@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 import os
+from pathlib import Path
 
 router = APIRouter()
 
@@ -170,3 +171,47 @@ async def get_providers():
             }
         ]
     }
+
+
+@router.get("/document/{filename}")
+async def get_full_document(filename: str):
+    """
+    Get the full content of a document by filename
+    Searches for the document in the pipeline/exampleFile directory
+    """
+    try:
+        # Define the documents directory path
+        base_dir = Path(__file__).parent.parent.parent.parent  # Go up to project root
+        docs_dir = base_dir / "pipeline" / "exampleFile"
+        
+        # Security: Prevent directory traversal
+        filename = Path(filename).name
+        
+        # Try to find the file
+        file_path = docs_dir / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"Document '{filename}' not found")
+        
+        # Read the file content
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            # If UTF-8 fails, try other encodings
+            with open(file_path, 'r', encoding='latin-1') as f:
+                content = f.read()
+        
+        return {
+            "filename": filename,
+            "content": content,
+            "file_type": file_path.suffix[1:] if file_path.suffix else "txt"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading document: {str(e)}"
+        )
