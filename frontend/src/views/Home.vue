@@ -358,9 +358,16 @@ const sendMessage = async (content) => {
   isTyping.value = true
   
   try {
-    // Call RAG chat endpoint
+    // Prepare conversation history (exclude expandedSources which is UI-only)
+    const conversationHistory = messages.value.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+    
+    // Call RAG chat endpoint with conversation history
     const response = await axios.post(`${apiUrl}/api/chat`, {
-      message: content
+      message: content,
+      history: conversationHistory
     })
     
     // Create assistant message

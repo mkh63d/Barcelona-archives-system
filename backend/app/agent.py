@@ -61,18 +61,26 @@ def get_llm():
         raise ValueError(f"Unsupported model provider: {provider}")
 
 
-def route_query(query: str) -> Dict:
+def route_query(query: str, history: Optional[List[Dict]] = None) -> Dict:
     """
     Router prompt to classify user intent and determine appropriate action.
     
     Args:
         query: User's input message
+        history: Previous conversation messages
         
     Returns:
         Dict with route classification and metadata
     """
     try:
         llm = get_llm()
+        
+        # Build context from history if available
+        history_context = ""
+        if history and len(history) > 0:
+            history_context = "\n\nPrevious conversation context:\n"
+            for msg in history[-4:]:  # Last 4 messages for context
+                history_context += f"{msg['role'].upper()}: {msg['content'][:100]}...\n"
         
         router_prompt = f"""You are a query router for the Barcelona Historical Archives Assistant. 
 Your job is to classify the user's intent into ONE of these categories:
@@ -82,9 +90,10 @@ Your job is to classify the user's intent into ONE of these categories:
 
 2. ARCHIVE_QUERY - Legitimate questions about historical archives, documents, broadcasts, events, dates
    Examples: "What happened in 1945?", "Find documents about Radio Barcelona", "censored broadcasts"
+   NOTE: Follow-up questions like "tell me more", "what else?", "can you elaborate?" are ARCHIVE_QUERY if there's conversation history.
 
 3. CLARIFICATION - Ambiguous or vague input that needs clarification
-   Examples: "that thing", "the other one", single ambiguous words in archive context
+   Examples: "that thing", "the other one", single ambiguous words in archive context{history_context}
 
 Respond ONLY with a JSON object in this exact format:
 {{"route": "CASUAL", "confidence": 0.95, "reasoning": "brief explanation"}}
@@ -183,13 +192,14 @@ def retrieve_context(query: str, top_k: int = 3) -> tuple[str, List[Dict]]:
         return f"Error accessing archives database: {str(e)}", []
 
 
-def generate_response_by_route(query: str, route: str) -> str:
+def generate_response_by_route(query: str, route: str, conversation_context: str = "") -> str:
     """
     Generate dynamic response based on route using LLM.
     
     Args:
         query: User's input message
         route: Route classification (CASUAL or CLARIFICATION)
+        conversation_context: Previous conversation messages formatted as string
         
     Returns:
         Generated response string
@@ -198,31 +208,47 @@ def generate_response_by_route(query: str, route: str) -> str:
         llm = get_llm()
         
         if route == "CASUAL":
-            system_prompt = """You are the Expert Archivist for the Radio Barcelona Historical Archives.
-The user has sent a casual message (greeting, personal question, or off-topic comment).
+            system_prompt = """You are a friendly assistant for the Radio Barcelona Historical Archives.
 
-Respond warmly and professionally, then guide them toward using the archives:
-- If it's a greeting, welcome them and briefly explain what you can help with
-- If it's off-topic, politely acknowledge and redirect to archive research
-- Keep it concise (2-3 sentences)
-- Invite them to ask about historical documents, broadcasts, or events"""
+The user is having a casual conversation (greetings, personal questions, general chat).
+
+IMPORTANT RULES:
+1. You MUST remember information from the conversation history
+2. If the user asks about something they told you (name, preferences, etc.), recall it from the conversation history
+3. For greetings, be warm and welcoming
+4. For personal questions about the user, use conversation memory
+5. For off-topic questions, politely redirect to archive topics while staying friendly
+6. Always maintain conversation continuity and remember what was discussed
+7. Always respond in a language the user used in their message, unless requested otherwise
+
+Be natural, friendly, and conversational while remembering the context."""
 
         elif route == "CLARIFICATION":
-            system_prompt = """You are the Expert Archivist for the Radio Barcelona Historical Archives.
-The user's query is too vague or ambiguous to search the archives effectively.
+            system_prompt = """You are a helpful assistant for the Radio Barcelona Historical Archives.
 
-Ask for clarification in a helpful way:
-- Point out what's unclear about their request
-- Give 2-3 specific examples of how they could rephrase
-- Suggest types of information they might search for (dates, topics, people, events)
-- Keep it helpful and encouraging"""
+The user's question is unclear or ambiguous.
+
+IMPORTANT RULES:
+1. Check conversation history for context that might clarify their question
+2. If they're referring to something from previous messages, acknowledge it
+3. Ask specific questions to understand what they need
+4. Provide examples of what kind of information they might be looking for
+5. Be helpful and guide them toward clearer questions
+6. Always respond in a language the user used in their message, unless requested otherwise
+
+Be patient and constructive."""
 
         else:
             # Shouldn't reach here, but fallback
             return "I'm here to help with historical archive research. What would you like to know?"
         
+        # Include conversation context in the prompt
+        full_prompt = system_prompt
+        if conversation_context:
+            full_prompt += f"\n\n{conversation_context}"
+        
         messages = [
-            SystemMessage(content=system_prompt),
+            SystemMessage(content=full_prompt),
             HumanMessage(content=f"User message: {query}\n\nGenerate an appropriate response:")
         ]
         
@@ -241,7 +267,7 @@ Ask for clarification in a helpful way:
             return "Could you please provide more details about what you're looking for in the archives?"
 
 
-def process_query(query: str) -> dict:
+def process_query(query: str, history: Optional[List[Dict]] = None) -> dict:
     """
     Process a user query using RAG (Retrieval Augmented Generation) with LangChain.
     
@@ -249,11 +275,12 @@ def process_query(query: str) -> dict:
     1. Route query to determine intent (casual, archive query, clarification)
     2. Handle accordingly:
        - CASUAL: Generate friendly response without RAG
-       - ARCHIVE_QUERY: Retrieve documents and generate RAG response
+       - ARCHIVE_QUERY: Retrieve documents and generate RAG response with history
        - CLARIFICATION: Ask for more details
     
     Args:
         query: User's question
+        history: Previous conversation messages (list of dicts with 'role' and 'content')
         
     Returns:
         Dict containing response, query, sources, and metadata
@@ -261,15 +288,28 @@ def process_query(query: str) -> dict:
     try:
         llm = get_llm()
         
+        # Ensure history is a list
+        if history is None:
+            history = []
+        
         # Step 1: Route the query to determine intent
-        logger.info(f"🔍 Routing query: {query[:100]}...")
-        route_result = route_query(query)
+        logger.info(f"🔍 Routing query: {query[:100]}... (with {len(history)} previous messages)")
+        route_result = route_query(query, history=history)
         route = route_result.get("route", "ARCHIVE_QUERY")
         
         # Step 2: Handle based on route
         if route in ["CASUAL", "CLARIFICATION"]:
-            # Generate dynamic response without RAG
-            response_content = generate_response_by_route(query, route)
+            # Build conversation context for casual/clarification
+            conversation_context = ""
+            if history and len(history) > 0:
+                recent_history = history[-6:]  # Last 6 messages for context
+                conversation_context = "\n\nCONVERSATION HISTORY:\n"
+                for msg in recent_history:
+                    role = "User" if msg.get("role") == "user" else "Assistant"
+                    conversation_context += f"{role}: {msg.get('content', '')}\n"
+            
+            # Generate dynamic response with conversation memory
+            response_content = generate_response_by_route(query, route, conversation_context)
             
             logger.info(f"✅ Responded to {route} query")
             return {
@@ -284,39 +324,42 @@ def process_query(query: str) -> dict:
         logger.info(f"📚 Processing archive query with RAG...")
         context, source_documents = retrieve_context(query, top_k=3)
         
-        # Create RAG prompt with retrieved context
-        system_prompt = """You are the Expert Archivist for the Radio Barcelona Historical Archives.
-Your mission is to assist users in exploring historical documents from various eras.
+        # Build conversation history context
+        history_text = ""
+        if history and len(history) > 0:
+            history_text = "\n\nCONVERSATION HISTORY (for context continuity):\n"
+            for msg in history[-6:]:  # Last 6 messages for context
+                role = "User" if msg.get('role') == 'user' else "Assistant"
+                history_text += f"{role}: {msg.get('content', '')}\n"
+        
+        # Create RAG prompt with retrieved context and conversation history
+        system_prompt = f"""You are an Expert Archivist for Radio Barcelona's Historical Archives.
 
-OPERATING GUIDELINES:
-
-1.  **STRICT SOURCE GROUNDING:**
-    * Answer ONLY based on the "RETRIEVED ARCHIVE DOCUMENTS" provided below.
-    * If the answer is not in the documents, state clearly: "I cannot find information about this in the available archives." Do not invent facts.
-
-2.  **HISTORICAL CONTEXT & NEUTRALITY:**
-    * You are analyzing historical documents that may contain propaganda, censorship, or biased language from their respective eras.
-    * **CRITICAL:** Do not treat political statements in the text as absolute facts. Use phrases like "The document states...", "According to the broadcast...", or "The censorship log notes...".
-    * If censorship markings (e.g., crossed-out text) are visible/mentioned, point them out.
-
-3.  **MANDATORY CITATIONS:**
-    * Every fact must be backed by a source.
-    * Format: (Source: [filename]) -> "Quote/Paraphrase"
-
-4.  **LANGUAGE MIRRORING:**
-    * Always answer in the same language as the USER QUESTION (e.g., Polish for Polish queries).
-
-5.  **UNCERTAINTY:**
-    * If a document is illegible or the query is ambiguous based on the available files, ask the user to narrow down their search."""
-
-        user_prompt = f"""Based on the following retrieved documents, answer the user's question following the Operating Guidelines.
-
-RETRIEVED ARCHIVE DOCUMENTS:
+YOUR PRIMARY SOURCES:
 {context}
 
-USER QUESTION: {query}
+GUIDELINES:
+1. ANSWER PRIMARILY from the retrieved archive documents above
+2. For ARCHIVE QUESTIONS: Ground your response in the documents, cite sources explicitly
+3. For PERSONAL/CONVERSATIONAL QUESTIONS: You may answer from conversation history without requiring archive sources
+4. Use conversation history to maintain context and remember user information (names, preferences, previous topics)
+5. If asked about previous conversation ("what did I say?", "my name?", etc.), answer from conversation history
+6. If archive documents are relevant, prioritize them; if not relevant, use conversation memory
+7. Be helpful, accurate, and distinguish between archive knowledge and conversation memory
+8. Cite sources when using archive documents: [Source: filename]
+9. If archive documents don't contain the answer but it's in conversation history, say so explicitly
+10. Always respond in a language the user used in their message, unless requested otherwise or quoting archive content
 
-Provide a comprehensive response."""
+CONVERSATION CONTINUITY:
+- Remember user information shared in this conversation
+- Reference previous topics when relevant
+- Maintain conversational flow across multiple questions{history_text}
+
+Current user question: {query}
+
+Provide a helpful, accurate response."""
+
+        user_prompt = query
         
         messages = [
             SystemMessage(content=system_prompt),

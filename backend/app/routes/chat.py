@@ -1,14 +1,20 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 import os
 
 router = APIRouter()
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    history: Optional[List[ChatMessage]] = []
 
 
 class SourceDocument(BaseModel):
@@ -59,8 +65,11 @@ async def chat(request: ChatRequest):
     import uuid
     
     try:
-        # Process the query with RAG
-        result = process_query(request.message)
+        # Convert history to dict format for agent
+        history = [{'role': msg.role, 'content': msg.content} for msg in (request.history or [])]
+        
+        # Process the query with RAG and conversation history
+        result = process_query(request.message, history=history)
         
         conversation_id = request.conversation_id or str(uuid.uuid4())
         
