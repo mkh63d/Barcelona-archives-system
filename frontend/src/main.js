@@ -4,11 +4,13 @@ import './style.css'
 import App from './App.vue'
 import Home from './views/Home.vue'
 import Settings from './views/Settings.vue'
+import SourceView from './views/SourceView.vue'
 
 const routes = [
   { path: '/', component: Home },
   { path: '/chat/:id?', component: Home },
-  { path: '/settings', component: Settings }
+  { path: '/settings', component: Settings },
+  { path: '/source/:source', component: SourceView }
 ]
 
 const router = createRouter({
